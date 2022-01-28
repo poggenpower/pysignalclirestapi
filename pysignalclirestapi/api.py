@@ -36,7 +36,7 @@ class SignalCliRestApiHTTPBasicAuth(SignalCliRestApiAuth):
 class SignalCliRestApi(object):
     """SignalCliRestApi implementation."""
 
-    def __init__(self, base_url, number, auth=None):
+    def __init__(self, base_url, number, auth=None, verify=True):
         """Initialize the class."""
         super(SignalCliRestApi, self).__init__()
         self._base_url = base_url
@@ -47,11 +47,15 @@ class SignalCliRestApi(object):
             self._auth = auth.get_auth()
         else:
             self._auth = None
+        self._requests = requests.Session()
+        self._requests.auth = self._auth
+        self._requests.verify = verify
+
 
     def api_info(self):
         try:
-            resp = requests.get(
-                self._base_url + "/v1/about", auth=self._auth)
+            resp = self._requests.get(
+                self._base_url + "/v1/about")
             if resp.status_code == 404:
                 return ["v1", 1]
             data = json.loads(resp.content)
@@ -66,10 +70,10 @@ class SignalCliRestApi(object):
 
         except Exception as exc:
             raise_from(SignalCliRestApiError(
-                "Couldn't determine REST API version"), exc)
+                "Couldn't determine REST API version. Status: {}".format(resp.status_code)), exc)
 
     def mode(self):
-        resp = requests.get(self._base_url + "/v1/about",
+        resp = self._requests.get(self._base_url + "/v1/about",
                             auth=self._auth)
         data = json.loads(resp.content)
 
@@ -88,13 +92,13 @@ class SignalCliRestApi(object):
                 "members": members,
                 "name": name
             }
-            resp = requests.post(url, json=data, auth=self._auth)
+            resp = self._requests.post(url, json=data)
             if resp.status_code != 201 and resp.status_code != 200:
                 json_resp = resp.json()
                 if "error" in json_resp:
                     raise SignalCliRestApiError(json_resp["error"])
                 raise SignalCliRestApiError(
-                    "Unknown error while creating Signal Messenger group")
+                    "Unknown error while creating Signal Messenger group. Status: {}".format(resp.status_code))
             return resp.json()["id"]
         except Exception as exc:
             if exc.__class__ == SignalCliRestApiError:
@@ -105,13 +109,13 @@ class SignalCliRestApi(object):
     def list_groups(self):
         try:
             url = self._base_url + "/v1/groups/" + self._number
-            resp = requests.get(url, auth=self._auth)
+            resp = self._requests.get(url)
             json_resp = resp.json()
             if resp.status_code != 200:
                 if "error" in json_resp:
                     raise SignalCliRestApiError(json_resp["error"])
                 raise SignalCliRestApiError(
-                    "Unknown error while listing Signal Messenger groups")
+                    "Unknown error while listing Signal Messenger groups. Status: {}".format(resp.status_code))
             return json_resp
         except Exception as exc:
             if exc.__class__ == SignalCliRestApiError:
@@ -119,16 +123,22 @@ class SignalCliRestApi(object):
             raise_from(SignalCliRestApiError(
                 "Couldn't list Signal Messenger groups: "), exc)
 
+    def get_group_id_by_name(self, name: str):
+        for group in self.list_groups():
+            if group['name'] == name:
+                return group['id']
+        return None
+
     def receive(self):
         try:
             url = self._base_url + "/v1/receive/" + self._number
-            resp = requests.get(url, auth=self._auth)
+            resp = self._requests.get(url)
             json_resp = resp.json()
             if resp.status_code != 200:
                 if "error" in json_resp:
                     raise SignalCliRestApiError(json_resp["error"])
                 raise SignalCliRestApiError(
-                    "Unknown error while receiving Signal Messenger data")
+                    "Unknown error while receiving Signal Messenger data. Status: {}".format(resp.status_code))
             return json_resp
         except Exception as exc:
             if exc.__class__ == SignalCliRestApiError:
@@ -153,13 +163,13 @@ class SignalCliRestApi(object):
                     base64_avatar = bytes_to_base64(ofile.read())
                     data["base64_avatar"] = base64_avatar
 
-            resp = requests.put(url, json=data, auth=self._auth)
+            resp = self._requests.put(url, json=data)
             if resp.status_code != 204:
                 json_resp = resp.json()
                 if "error" in json_resp:
                     raise SignalCliRestApiError(json_resp["error"])
                 raise SignalCliRestApiError(
-                    "Unknown error while updating profile")
+                    "Unknown error while updating profile. Status: {}".format(resp.status_code))
         except Exception as exc:
             if exc.__class__ == SignalCliRestApiError:
                 raise exc
@@ -209,13 +219,13 @@ class SignalCliRestApi(object):
                         base64_attachment = bytes_to_base64(ofile.read())
                         data["base64_attachment"] = base64_attachment
 
-            resp = requests.post(url, json=data, auth=self._auth)
+            resp = self._requests.post(url, json=data)
             if resp.status_code != 201:
                 json_resp = resp.json()
                 if "error" in json_resp:
                     raise SignalCliRestApiError(json_resp["error"])
                 raise SignalCliRestApiError(
-                    "Unknown error while sending signal message")
+                    "Unknown error while sending signal message. Status: {}".format(resp.status_code))
         except Exception as exc:
             if exc.__class__ == SignalCliRestApiError:
                 raise exc

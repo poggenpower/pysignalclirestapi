@@ -50,7 +50,7 @@ class SignalCliRestApi(object):
             self._auth = None
         self._requests = requests.Session()
         self._requests.auth = self._auth
-        self._requests.verify = verify_ssl
+        self._requests.verify = self._verify_ssl
 
 
     def about(self):

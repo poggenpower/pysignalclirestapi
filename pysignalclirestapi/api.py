@@ -59,6 +59,12 @@ class SignalCliRestApi(object):
             return resp.json()
         return None
 
+    def about(self):
+        resp = requests.get(self._base_url + "/v1/about", auth=self._auth, verify=self._verify_ssl)
+        if resp.status_code == 200:
+            return resp.json()
+        return None
+
     def api_info(self):
         try:
             data = self.about()
@@ -76,6 +82,12 @@ class SignalCliRestApi(object):
         except Exception as exc:
             raise_from(SignalCliRestApiError(
                 "Couldn't determine REST API version. Status: {}".format(resp.status_code)), exc)
+
+    def has_capability(self, endpoint, capability, about=None):
+        if about is None:
+            about = self.about()
+
+        return capability in about.get("capabilities", {}).get(endpoint, [])
 
     def has_capability(self, endpoint, capability, about=None):
         if about is None:
